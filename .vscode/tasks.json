@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "mcp: install",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": ["install"],
+      "group": "build"
+    },
+    {
+      "label": "mcp: build",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": ["run", "build"],
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "mcp: dev",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": ["run", "dev"],
+      "isBackground": true
+    },
+    {
+      "label": "mcp: start",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": ["run", "start"]
+    }
+  ]
+}

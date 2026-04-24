@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "multi-agent-orchestrator": {
+      "type": "stdio",
+      "command": "npm.cmd",
+      "args": ["run", "dev"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
