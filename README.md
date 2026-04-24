@@ -1,5 +1,12 @@
 # multi-agent-orchestrator
 
+[![MCP](https://img.shields.io/badge/Protocol-MCP-1f6feb?style=for-the-badge)](https://modelcontextprotocol.io)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![WebSocket](https://img.shields.io/badge/Transport-WebSocket-0b7285?style=for-the-badge&logo=socketdotio&logoColor=white)](#6-запуск-сервера)
+[![SQLite](https://img.shields.io/badge/Storage-SQLite-003b57?style=for-the-badge&logo=sqlite&logoColor=white)](#15-база-данных-и-сброс-состояния)
+[![VPS Ready](https://img.shields.io/badge/Deploy-VPS%20Ready-7a3cff?style=for-the-badge&logo=linux&logoColor=white)](#6-запуск-сервера)
+
 MCP-сервер для совместной работы множества ИИ-агентов с четкими ролями, quality-gates и персистентным состоянием в SQLite.
 
 Документ ниже содержит полный runbook: установка, запуск сервера, подключение MCP в VS Code, запуск локального клиента и диагностика проблем.
