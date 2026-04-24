@@ -8,17 +8,22 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
+    "start:ws": "node dist/index.js --transport ws",
+    "dev:ws": "tsx src/index.ts --transport ws",
     "client": "node dist/client.js",
-    "client:dev": "tsx src/client.ts"
+    "client:dev": "tsx src/client.ts",
+    "client:ws": "tsx src/client.ts --transport ws --server-url ws://127.0.0.1:8787"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.4",
     "sqlite": "^5.1.1",
     "sqlite3": "^6.0.1",
+    "ws": "^8.18.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/ws": "^8.5.13",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   }

@@ -73,6 +73,41 @@ node dist/index.js
 npm.cmd run dev
 ```
 
+### Вариант C: WebSocket transport (для удаленных подключений)
+
+Dev-режим:
+
+```powershell
+npm.cmd run dev:ws
+```
+
+Prod-режим:
+
+```powershell
+npm.cmd run build
+npm.cmd run start:ws
+```
+
+Запуск с явными параметрами:
+
+```powershell
+node dist/index.js --transport ws --ws-host 0.0.0.0 --ws-port 8787 --ws-path /
+```
+
+Параметры сервера:
+
+- --transport stdio | ws
+- --ws-host <host> (по умолчанию 0.0.0.0)
+- --ws-port <port> (по умолчанию 8787)
+- --ws-path <path> (по умолчанию /)
+
+Альтернатива через env:
+
+- MCP_TRANSPORT=ws
+- MCP_WS_HOST=0.0.0.0
+- MCP_WS_PORT=8787
+- MCP_WS_PATH=/
+
 ## 7) Подключение сервера в VS Code (GitHub Copilot MCP)
 
 Проект уже содержит готовый конфиг .vscode/mcp.json:
@@ -114,7 +149,10 @@ npm.cmd run dev
 
 ## 9) Запуск локального клиента
 
-Клиент расположен в src/client.ts и подключается к серверу по stdio.
+Клиент расположен в src/client.ts и поддерживает два транспорта:
+
+- stdio
+- ws
 
 ### Быстрый запуск demo-сценария
 
@@ -131,6 +169,26 @@ npm.cmd run client:dev -- --mode snapshot
 npm.cmd run client:dev -- --mode demo
 ```
 
+### Подключение клиента по WebSocket
+
+Локально:
+
+```powershell
+npm.cmd run client:ws
+```
+
+Явно указать URL:
+
+```powershell
+npm.cmd run client:dev -- --transport ws --server-url ws://127.0.0.1:8787 --mode snapshot
+```
+
+Подключение к VPS:
+
+```powershell
+npm.cmd run client:dev -- --transport ws --server-url ws://YOUR_VPS_IP:8787 --mode list-tools
+```
+
 ### Подключение клиента к кастомной команде сервера
 
 Пример запуска сервера через npm run dev:
@@ -141,10 +199,12 @@ npm.cmd run client:dev -- --server-command npm.cmd --server-args "run dev"
 
 Параметры клиента:
 
+- --transport stdio | ws
 - --mode list-tools | snapshot | demo
 - --server-command <команда>
 - --server-args "<аргументы через пробел>"
 - --server-cwd <рабочая папка>
+- --server-url ws://host:port/path
 - --run-escalation-scan
 
 ## 10) Полный сценарий запуска с нуля
@@ -156,6 +216,22 @@ npm.cmd run build
 npm.cmd run client:dev -- --mode list-tools
 npm.cmd run client:dev -- --mode demo
 npm.cmd run client:dev -- --mode snapshot
+```
+
+Сценарий через WebSocket:
+
+```powershell
+cd c:\Users\Liosh\Desktop\programming\MCP
+npm.cmd install
+npm.cmd run build
+npm.cmd run start:ws
+```
+
+В другом терминале:
+
+```powershell
+cd c:\Users\Liosh\Desktop\programming\MCP
+npm.cmd run client:dev -- --transport ws --server-url ws://127.0.0.1:8787 --mode demo
 ```
 
 ## 11) Доступные MCP tools
@@ -231,8 +307,11 @@ Remove-Item -Force .\data\orchestrator.db
 	"build": "tsc -p tsconfig.json",
 	"start": "node dist/index.js",
 	"dev": "tsx src/index.ts",
+	"start:ws": "node dist/index.js --transport ws",
+	"dev:ws": "tsx src/index.ts --transport ws",
 	"client": "node dist/client.js",
-	"client:dev": "tsx src/client.ts"
+	"client:dev": "tsx src/client.ts",
+	"client:ws": "tsx src/client.ts --transport ws --server-url ws://127.0.0.1:8787"
 }
 ```
 
@@ -270,3 +349,10 @@ npm.cmd run dev
 1. Проверьте --server-command и --server-args
 2. Проверьте рабочую директорию --server-cwd
 3. Запустите npm.cmd run client:dev -- --mode list-tools для быстрой диагностики
+
+### Проблема: WS-подключение извне не работает
+
+1. Запустите сервер с --transport ws и --ws-host 0.0.0.0
+2. Проверьте, что порт открыт на VPS (например, 8787)
+3. Проверьте firewall/security group
+4. Для продакшена используйте wss:// через reverse proxy (Nginx/Caddy)

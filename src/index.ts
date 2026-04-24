@@ -1,7 +1,10 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   CallToolRequestSchema,
+  JSONRPCMessageSchema,
+  type JSONRPCMessage,
   ListResourcesRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
@@ -10,6 +13,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { open, type Database } from "sqlite";
 import sqlite3 from "sqlite3";
+import { WebSocketServer, type WebSocket } from "ws";
 import { z } from "zod";
 
 const ROLE_CATALOG = [
@@ -89,18 +93,28 @@ const ESCALATION_THRESHOLDS_MINUTES = [10, 30, 60] as const;
 const PRIORITY_ORDER: TaskPriority[] = ["low", "normal", "high", "critical"];
 let db: Database<sqlite3.Database, sqlite3.Statement> | null = null;
 
-const server = new Server(
-  {
-    name: "multi-agent-orchestrator",
-    version: "2.0.0",
-  },
-  {
-    capabilities: {
-      tools: {},
-      resources: {},
+function getArg(flag: string): string | undefined {
+  const index = process.argv.indexOf(flag);
+  if (index === -1 || index + 1 >= process.argv.length) {
+    return undefined;
+  }
+  return process.argv[index + 1];
+}
+
+function createServerInstance() {
+  return new Server(
+    {
+      name: "multi-agent-orchestrator",
+      version: "2.0.0",
     },
-  },
-);
+    {
+      capabilities: {
+        tools: {},
+        resources: {},
+      },
+    },
+  );
+}
 
 const registerAgentSchema = z.object({
   agentId: z.string().min(1),
@@ -452,6 +466,55 @@ function rebalanceUnassignedTasks() {
   return changes;
 }
 
+class WebSocketServerTransport implements Transport {
+  onclose?: () => void;
+  onerror?: (error: Error) => void;
+  onmessage?: (message: JSONRPCMessage) => void;
+
+  private started = false;
+
+  constructor(private readonly socket: WebSocket) {}
+
+  async start(): Promise<void> {
+    if (this.started) {
+      throw new Error("WebSocketServerTransport already started");
+    }
+
+    this.started = true;
+
+    this.socket.on("message", (data) => {
+      try {
+        const raw = typeof data === "string" ? data : data.toString("utf-8");
+        const parsed = JSONRPCMessageSchema.parse(JSON.parse(raw));
+        this.onmessage?.(parsed);
+      } catch (error) {
+        this.onerror?.(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+
+    this.socket.on("close", () => {
+      this.onclose?.();
+    });
+
+    this.socket.on("error", (error) => {
+      this.onerror?.(error);
+    });
+  }
+
+  async send(message: JSONRPCMessage): Promise<void> {
+    if (this.socket.readyState !== 1) {
+      throw new Error("WebSocket is not open");
+    }
+
+    this.socket.send(JSON.stringify(message));
+  }
+
+  async close(): Promise<void> {
+    this.socket.close();
+  }
+}
+
+function registerServerHandlers(server: Server) {
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
@@ -1129,6 +1192,52 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
   throw new Error(`Неизвестный ресурс: ${request.params.uri}`);
 });
+}
+
+async function runStdioServer() {
+  const server = createServerInstance();
+  registerServerHandlers(server);
+
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+async function runWsServer() {
+  const wsHost = getArg("--ws-host") ?? process.env.MCP_WS_HOST ?? "0.0.0.0";
+  const wsPort = Number(getArg("--ws-port") ?? process.env.MCP_WS_PORT ?? 8787);
+  const wsPath = getArg("--ws-path") ?? process.env.MCP_WS_PATH ?? "/";
+
+  const wss = new WebSocketServer({
+    host: wsHost,
+    port: wsPort,
+    path: wsPath,
+    handleProtocols: (protocols) => {
+      return protocols.has("mcp") ? "mcp" : false;
+    },
+  });
+
+  wss.on("connection", (socket) => {
+    const server = createServerInstance();
+    registerServerHandlers(server);
+
+    const transport = new WebSocketServerTransport(socket);
+    void server.connect(transport).catch((error) => {
+      console.error("Failed to connect WS transport:", error);
+      void transport.close();
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    wss.once("listening", () => {
+      console.log(`MCP WS server listening on ws://${wsHost}:${wsPort}${wsPath}`);
+      resolve();
+    });
+
+    wss.once("error", (error) => {
+      reject(error);
+    });
+  });
+}
 
 async function main() {
   await initDatabase();
@@ -1140,8 +1249,18 @@ async function main() {
     });
   }, ESCALATION_SCAN_INTERVAL_MS);
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  const transportMode = getArg("--transport") ?? process.env.MCP_TRANSPORT ?? "stdio";
+
+  if (transportMode === "ws") {
+    await runWsServer();
+    return;
+  }
+
+  if (transportMode !== "stdio") {
+    throw new Error(`Неизвестный transport: ${transportMode}. Ожидалось stdio или ws`);
+  }
+
+  await runStdioServer();
 }
 
 main().catch((error) => {

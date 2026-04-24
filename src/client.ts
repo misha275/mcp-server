@@ -1,5 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
@@ -39,9 +41,11 @@ function parseToolTextResult(result: unknown): JsonValue {
 
 async function main() {
   const mode = getArg("--mode") ?? "demo";
+  const transportMode = getArg("--transport") ?? "stdio";
   const serverCommand = getArg("--server-command") ?? "node";
   const serverArgs = getArg("--server-args")?.split(" ").filter(Boolean) ?? ["dist/index.js"];
   const serverCwd = getArg("--server-cwd") ?? process.cwd();
+  const serverUrl = getArg("--server-url") ?? "ws://127.0.0.1:8787";
 
   const client = new Client(
     {
@@ -53,12 +57,19 @@ async function main() {
     },
   );
 
-  const transport = new StdioClientTransport({
-    command: serverCommand,
-    args: serverArgs,
-    cwd: serverCwd,
-    stderr: "inherit",
-  });
+  let transport: Transport;
+  if (transportMode === "ws") {
+    transport = new WebSocketClientTransport(new URL(serverUrl));
+  } else if (transportMode === "stdio") {
+    transport = new StdioClientTransport({
+      command: serverCommand,
+      args: serverArgs,
+      cwd: serverCwd,
+      stderr: "inherit",
+    });
+  } else {
+    throw new Error(`Неизвестный transport: ${transportMode}. Ожидалось stdio или ws`);
+  }
 
   await client.connect(transport);
 
